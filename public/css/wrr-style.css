@@ -1,0 +1,138 @@
+/* Reward Roulette Styles */
+
+.wrr-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease;
+}
+
+.wrr-overlay.wrr-open {
+    opacity: 1;
+    visibility: visible;
+}
+
+.wrr-modal {
+    background: #fff;
+    width: 90%;
+    max-width: 450px;
+    border-radius: 20px;
+    padding: 30px;
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    text-align: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    transform: scale(0.9);
+    transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.wrr-overlay.wrr-open .wrr-modal {
+    transform: scale(1);
+}
+
+.wrr-close-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+}
+
+.wrr-header h2 {
+    margin: 0 0 10px;
+    color: #333;
+    font-size: 24px;
+}
+
+.wrr-header p {
+    margin: 0 0 20px;
+    color: #666;
+}
+
+.wrr-game-area {
+    margin: 20px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.wrr-wheel-wrapper {
+    position: relative;
+    width: 300px;
+    height: 300px;
+}
+
+.wrr-pointer {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; 
+    height: 0; 
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-top: 25px solid #333;
+    z-index: 10;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.2));
+}
+
+#wrr-canvas {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+    transition: transform 5s cubic-bezier(0.25, 0.1, 0.25, 1); /* Fallback transition */
+}
+
+.wrr-btn-primary {
+    background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 50px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.wrr-btn-primary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.wrr-btn-primary:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.6);
+}
+
+.wrr-result {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    color: #166534;
+    border-radius: 10px;
+    font-weight: bold;
+    animation: fadeIn 0.5s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
