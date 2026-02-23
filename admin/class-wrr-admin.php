@@ -77,6 +77,14 @@ class WRR_Admin {
                 'min_orders' => intval($_POST['min_orders']),
                 'allowed_roles' => isset($_POST['allowed_roles']) ? array_map('sanitize_text_field', $_POST['allowed_roles']) : array()
             );
+
+            // Registration fields visibility
+            $reg_fields = array(
+                'first_name' => isset($_POST['reg_field_first_name']) ? 1 : 0,
+                'last_name'  => isset($_POST['reg_field_last_name']) ? 1 : 0,
+                'date_of_birth' => isset($_POST['reg_field_dob']) ? 1 : 0
+            );
+            update_option('wrr_registration_fields', $reg_fields);
             update_option('wrr_targeting_settings', $settings);
             echo '<div class="notice notice-success"><p>Налаштування збережено!</p></div>';
         }
@@ -257,6 +265,16 @@ class WRR_Admin {
                             <th scope="row">Мінімальна Кількість Замовлень</th>
                             <td>
                                 <input type="number" name="min_orders" value="<?php echo esc_attr($settings['min_orders']); ?>" class="regular-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Поля реєстрації (WooCommerce)</th>
+                            <td>
+                                <?php $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0)); ?>
+                                <label style="display:block; margin-bottom:5px;"><input type="checkbox" name="reg_field_first_name" value="1" <?php checked(!empty($reg_fields['first_name']),1); ?>> Показувати поле "Ім'я"</label>
+                                <label style="display:block; margin-bottom:5px;"><input type="checkbox" name="reg_field_last_name" value="1" <?php checked(!empty($reg_fields['last_name']),1); ?>> Показувати поле "Прізвище"</label>
+                                <label style="display:block; margin-bottom:5px;"><input type="checkbox" name="reg_field_dob" value="1" <?php checked(!empty($reg_fields['date_of_birth']),1); ?>> Показувати поле "Дата народження"</label>
+                                <p class="description">Виберіть, які додаткові поля будуть додаватися у форму реєстрації WooCommerce.</p>
                             </td>
                         </tr>
                         <tr>

@@ -55,6 +55,9 @@ class WRR_Public {
                 'confetti' => true // Feature flag
             )
         ));
+        // Pass registration field visibility to fallback script
+        $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
+        wp_localize_script('wrr-register-fallback', 'wrr_register_settings', array('fields' => $reg_fields));
     }
 
     /**
@@ -64,26 +67,35 @@ class WRR_Public {
         if ( defined('WP_DEBUG') && WP_DEBUG ) {
             error_log('WRR: render_register_fields fired on ' . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown'));
         }
+        // Check settings which fields to show
+        $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
+
         // Preserve posted values
         $first = isset($_POST['wrr_first_name']) ? esc_attr($_POST['wrr_first_name']) : '';
         $last  = isset($_POST['wrr_last_name']) ? esc_attr($_POST['wrr_last_name']) : '';
         $dob   = isset($_POST['wrr_dob']) ? esc_attr($_POST['wrr_dob']) : '';
 
         ?>
+        <?php if (!empty($reg_fields['first_name'])): ?>
         <p class="form-row form-row-first">
             <label for="reg_wrr_first_name"><?php esc_html_e('First name', 'reward-roulette'); ?> <span class="required">*</span></label>
             <input type="text" class="input-text" name="wrr_first_name" id="reg_wrr_first_name" value="<?php echo $first; ?>" />
         </p>
+        <?php endif; ?>
 
+        <?php if (!empty($reg_fields['last_name'])): ?>
         <p class="form-row form-row-last">
             <label for="reg_wrr_last_name"><?php esc_html_e('Last name', 'reward-roulette'); ?> <span class="required">*</span></label>
             <input type="text" class="input-text" name="wrr_last_name" id="reg_wrr_last_name" value="<?php echo $last; ?>" />
         </p>
+        <?php endif; ?>
 
+        <?php if (!empty($reg_fields['date_of_birth'])): ?>
         <p class="form-row form-row-wide">
             <label for="reg_wrr_dob"><?php esc_html_e('Date of birth', 'reward-roulette'); ?></label>
             <input type="date" class="input-text" name="wrr_dob" id="reg_wrr_dob" value="<?php echo $dob; ?>" />
         </p>
+        <?php endif; ?>
         <div class="clear"></div>
         <?php
     }

@@ -3,7 +3,13 @@
 
     function injectRegisterFields() {
         // If already added, do nothing
-        if ($('#reg_wrr_dob').length) return;
+        if (typeof wrr_register_settings !== 'undefined') {
+            // If dob exists and was inserted already, skip
+            if (wrr_register_settings.fields.date_of_birth && $('#reg_wrr_dob').length) return;
+            if (wrr_register_settings.fields.first_name && $('#reg_wrr_first_name').length) return;
+        } else {
+            if ($('#reg_wrr_dob').length || $('#reg_wrr_first_name').length) return;
+        }
 
         // Common registration form selectors
         var selectors = ['form#registerform', 'form.woocommerce-form--register', 'form.woocommerce-form.register', 'form.register'];
@@ -22,11 +28,16 @@
 
         // Try to append near submit button if exists
         var $submit = $form.find('button[type=submit], input[type=submit]').last();
-        if ($submit.length) {
-            $submit.before($first).before($last).before($dob);
-        } else {
-            $form.append($first).append($last).append($dob);
-        }
+        // Insert only enabled fields (settings localized into wrr_register_settings)
+        var fields = (typeof wrr_register_settings !== 'undefined' && wrr_register_settings.fields) ? wrr_register_settings.fields : {first_name:1,last_name:1,date_of_birth:0};
+
+        var insertBefore = function($el){
+            if ($submit.length) { $submit.before($el); } else { $form.append($el); }
+        };
+
+        if (fields.first_name) insertBefore($first);
+        if (fields.last_name) insertBefore($last);
+        if (fields.date_of_birth) insertBefore($dob);
     }
 
     $(document).ready(function(){
