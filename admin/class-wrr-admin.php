@@ -85,6 +85,15 @@ class WRR_Admin {
                 'date_of_birth' => isset($_POST['reg_field_dob']) ? 1 : 0
             );
             update_option('wrr_registration_fields', $reg_fields);
+
+            // Registration field labels
+            $reg_labels = array(
+                'first_name' => isset($_POST['reg_label_first_name']) ? sanitize_text_field($_POST['reg_label_first_name']) : 'First name',
+                'last_name' => isset($_POST['reg_label_last_name']) ? sanitize_text_field($_POST['reg_label_last_name']) : 'Last name',
+                'date_of_birth' => isset($_POST['reg_label_dob']) ? sanitize_text_field($_POST['reg_label_dob']) : 'Date of birth'
+            );
+            update_option('wrr_registration_labels', $reg_labels);
+
             update_option('wrr_targeting_settings', $settings);
             echo '<div class="notice notice-success"><p>Налаштування збережено!</p></div>';
         }
@@ -270,11 +279,29 @@ class WRR_Admin {
                         <tr>
                             <th scope="row">Поля реєстрації (WooCommerce)</th>
                             <td>
-                                <?php $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0)); ?>
-                                <label style="display:block; margin-bottom:5px;"><input type="checkbox" name="reg_field_first_name" value="1" <?php checked(!empty($reg_fields['first_name']),1); ?>> Показувати поле "Ім'я"</label>
-                                <label style="display:block; margin-bottom:5px;"><input type="checkbox" name="reg_field_last_name" value="1" <?php checked(!empty($reg_fields['last_name']),1); ?>> Показувати поле "Прізвище"</label>
-                                <label style="display:block; margin-bottom:5px;"><input type="checkbox" name="reg_field_dob" value="1" <?php checked(!empty($reg_fields['date_of_birth']),1); ?>> Показувати поле "Дата народження"</label>
-                                <p class="description">Виберіть, які додаткові поля будуть додаватися у форму реєстрації WooCommerce.</p>
+                                <?php
+                                $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
+                                $reg_labels = get_option('wrr_registration_labels', array('first_name' => 'First name', 'last_name' => 'Last name', 'date_of_birth' => 'Date of birth'));
+                                ?>
+                                <label style="display:block; margin-bottom:5px;">
+                                    <input type="checkbox" name="reg_field_first_name" value="1" <?php checked(!empty($reg_fields['first_name']),1); ?>>
+                                    Показувати поле "Ім'я"
+                                </label>
+                                <input type="text" name="reg_label_first_name" value="<?php echo esc_attr($reg_labels['first_name']); ?>" class="regular-text" style="margin-bottom:10px;">
+
+                                <label style="display:block; margin-bottom:5px;">
+                                    <input type="checkbox" name="reg_field_last_name" value="1" <?php checked(!empty($reg_fields['last_name']),1); ?>>
+                                    Показувати поле "Прізвище"
+                                </label>
+                                <input type="text" name="reg_label_last_name" value="<?php echo esc_attr($reg_labels['last_name']); ?>" class="regular-text" style="margin-bottom:10px;">
+
+                                <label style="display:block; margin-bottom:5px;">
+                                    <input type="checkbox" name="reg_field_dob" value="1" <?php checked(!empty($reg_fields['date_of_birth']),1); ?>>
+                                    Показувати поле "Дата народження"
+                                </label>
+                                <input type="text" name="reg_label_dob" value="<?php echo esc_attr($reg_labels['date_of_birth']); ?>" class="regular-text">
+
+                                <p class="description">Виберіть, які додаткові поля будуть додаватися у форму реєстрації WooCommerce та задайте їхні назви.</p>
                             </td>
                         </tr>
                         <tr>

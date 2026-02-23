@@ -22,9 +22,10 @@
 
         if (!$form.length) return;
 
-        var $first = $("<p class=\"form-row form-row-first\"><label for=\"reg_wrr_first_name\">First name <span class=\"required\">*</span></label><input type=\"text\" class=\"input-text\" name=\"wrr_first_name\" id=\"reg_wrr_first_name\" /></p>");
-        var $last = $("<p class=\"form-row form-row-last\"><label for=\"reg_wrr_last_name\">Last name <span class=\"required\">*</span></label><input type=\"text\" class=\"input-text\" name=\"wrr_last_name\" id=\"reg_wrr_last_name\" /></p>");
-        var $dob = $("<p class=\"form-row form-row-wide\"><label for=\"reg_wrr_dob\">Date of birth</label><input type=\"date\" class=\"input-text\" name=\"wrr_dob\" id=\"reg_wrr_dob\" /></p>");
+        var labels = (typeof wrr_register_settings !== 'undefined' && wrr_register_settings.labels) ? wrr_register_settings.labels : {first_name: 'First name', last_name: 'Last name', date_of_birth: 'Date of birth'};
+        var $first = $("<p class=\"form-row form-row-first\"><label for=\"reg_wrr_first_name\">" + labels.first_name + " <span class=\"required\">*</span></label><input type=\"text\" class=\"input-text\" name=\"wrr_first_name\" id=\"reg_wrr_first_name\" /></p>");
+        var $last = $("<p class=\"form-row form-row-last\"><label for=\"reg_wrr_last_name\">" + labels.last_name + " <span class=\"required\">*</span></label><input type=\"text\" class=\"input-text\" name=\"wrr_last_name\" id=\"reg_wrr_last_name\" /></p>");
+        var $dob = $("<p class=\"form-row form-row-wide\"><label for=\"reg_wrr_dob\">" + labels.date_of_birth + "</label><input type=\"date\" class=\"input-text\" name=\"wrr_dob\" id=\"reg_wrr_dob\" /></p>");
 
         // Try to append near submit button if exists
         var $submit = $form.find('button[type=submit], input[type=submit]').last();

@@ -54,9 +54,10 @@ class WRR_Public {
                 'confetti' => true // Feature flag
             )
         ));
-        // Pass registration field visibility to fallback script
+        // Pass registration field visibility and labels to fallback script
         $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
-        wp_localize_script('wrr-register-fallback', 'wrr_register_settings', array('fields' => $reg_fields));
+        $reg_labels = get_option('wrr_registration_labels', array('first_name' => 'First name', 'last_name' => 'Last name', 'date_of_birth' => 'Date of birth'));
+        wp_localize_script('wrr-register-fallback', 'wrr_register_settings', array('fields' => $reg_fields, 'labels' => $reg_labels));
     }
 
     /**
@@ -73,8 +74,9 @@ class WRR_Public {
             return;
         }
         $wrr_rendered = true;
-        // Check settings which fields to show
+        // Check settings which fields to show and labels
         $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
+        $reg_labels = get_option('wrr_registration_labels', array('first_name' => 'First name', 'last_name' => 'Last name', 'date_of_birth' => 'Date of birth'));
 
         // Preserve posted values
         $first = isset($_POST['wrr_first_name']) ? esc_attr($_POST['wrr_first_name']) : '';
@@ -84,21 +86,21 @@ class WRR_Public {
         ?>
         <?php if (!empty($reg_fields['first_name'])): ?>
         <p class="form-row form-row-first">
-            <label for="reg_wrr_first_name"><?php esc_html_e('First name', 'reward-roulette'); ?> <span class="required">*</span></label>
+            <label for="reg_wrr_first_name"><?php echo esc_html($reg_labels['first_name']); ?> <span class="required">*</span></label>
             <input type="text" class="input-text" name="wrr_first_name" id="reg_wrr_first_name" value="<?php echo $first; ?>" />
         </p>
         <?php endif; ?>
 
         <?php if (!empty($reg_fields['last_name'])): ?>
         <p class="form-row form-row-last">
-            <label for="reg_wrr_last_name"><?php esc_html_e('Last name', 'reward-roulette'); ?> <span class="required">*</span></label>
+            <label for="reg_wrr_last_name"><?php echo esc_html($reg_labels['last_name']); ?> <span class="required">*</span></label>
             <input type="text" class="input-text" name="wrr_last_name" id="reg_wrr_last_name" value="<?php echo $last; ?>" />
         </p>
         <?php endif; ?>
 
         <?php if (!empty($reg_fields['date_of_birth'])): ?>
         <p class="form-row form-row-wide">
-            <label for="reg_wrr_dob"><?php esc_html_e('Date of birth', 'reward-roulette'); ?></label>
+            <label for="reg_wrr_dob"><?php echo esc_html($reg_labels['date_of_birth']); ?></label>
             <input type="date" class="input-text" name="wrr_dob" id="reg_wrr_dob" value="<?php echo $dob; ?>" />
         </p>
         <?php endif; ?>
