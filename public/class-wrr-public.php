@@ -20,9 +20,8 @@ class WRR_Public {
         // Registration fields integration
         // Support WooCommerce registration form if WC active
         if ( class_exists('WooCommerce') ) {
-            add_action('woocommerce_register_form_start', array($this, 'render_register_fields'));
+            // Attach to the main WooCommerce register form hook only (avoid duplicate rendering)
             add_action('woocommerce_register_form', array($this, 'render_register_fields'));
-            add_action('woocommerce_register_form_end', array($this, 'render_register_fields'));
             add_action('woocommerce_register_post', array($this, 'validate_register_fields'), 10, 3);
             add_action('woocommerce_created_customer', array($this, 'save_register_fields'), 10, 1);
         }
@@ -67,6 +66,13 @@ class WRR_Public {
         if ( defined('WP_DEBUG') && WP_DEBUG ) {
             error_log('WRR: render_register_fields fired on ' . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown'));
         }
+
+        // Prevent duplicate rendering within same request
+        static $wrr_rendered = false;
+        if ( $wrr_rendered ) {
+            return;
+        }
+        $wrr_rendered = true;
         // Check settings which fields to show
         $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
 
