@@ -42,6 +42,8 @@ class WRR_Public {
 
         wp_enqueue_style('wrr-style', WRR_PLUGIN_URL . 'public/css/wrr-style.css', array(), WRR_VERSION);
         wp_enqueue_script('wrr-script', WRR_PLUGIN_URL . 'public/js/wrr-script.js', array('jquery'), WRR_VERSION, true);
+        // Fallback script to inject registration fields if theme overrides server-side hooks
+        wp_enqueue_script('wrr-register-fallback', WRR_PLUGIN_URL . 'public/js/wrr-register-fallback.js', array('jquery'), WRR_VERSION, true);
 
         $sectors = WRR_Database::get_sectors();
         
@@ -59,6 +61,9 @@ class WRR_Public {
      * Render additional registration fields on WooCommerce register form
      */
     public function render_register_fields() {
+        if ( defined('WP_DEBUG') && WP_DEBUG ) {
+            error_log('WRR: render_register_fields fired on ' . (isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : 'unknown'));
+        }
         // Preserve posted values
         $first = isset($_POST['wrr_first_name']) ? esc_attr($_POST['wrr_first_name']) : '';
         $last  = isset($_POST['wrr_last_name']) ? esc_attr($_POST['wrr_last_name']) : '';
