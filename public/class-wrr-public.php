@@ -17,12 +17,20 @@ class WRR_Public {
     private function __construct() {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
 
-        // WooCommerce registration fields integration
+        // Registration fields integration
+        // Support WooCommerce registration form if WC active
         if ( class_exists('WooCommerce') ) {
+            add_action('woocommerce_register_form_start', array($this, 'render_register_fields'));
             add_action('woocommerce_register_form', array($this, 'render_register_fields'));
+            add_action('woocommerce_register_form_end', array($this, 'render_register_fields'));
             add_action('woocommerce_register_post', array($this, 'validate_register_fields'), 10, 3);
             add_action('woocommerce_created_customer', array($this, 'save_register_fields'), 10, 1);
         }
+
+        // Support WP core registration form (when site uses default register.php)
+        add_action('register_form', array($this, 'render_register_fields'));
+        add_filter('registration_errors', array($this, 'validate_register_fields_wp'), 10, 3);
+        add_action('user_register', array($this, 'save_register_fields'));
     }
 
     public function enqueue_scripts() {
@@ -97,6 +105,28 @@ class WRR_Public {
                 $validation_errors->add('wrr_dob_error', __('Invalid date of birth.', 'reward-roulette'));
             }
         }
+    }
+
+    /**
+     * Validate for WP core registration_errors filter
+     */
+    public function validate_register_fields_wp($errors, $sanitized_user_login, $user_email) {
+        if ( isset($_POST['wrr_first_name']) && empty(trim($_POST['wrr_first_name'])) ) {
+            $errors->add('wrr_first_name_error', __('First name is required.', 'reward-roulette'));
+        }
+
+        if ( isset($_POST['wrr_last_name']) && empty(trim($_POST['wrr_last_name'])) ) {
+            $errors->add('wrr_last_name_error', __('Last name is required.', 'reward-roulette'));
+        }
+
+        if ( isset($_POST['wrr_dob']) && !empty($_POST['wrr_dob']) ) {
+            $d = sanitize_text_field($_POST['wrr_dob']);
+            if ( ! strtotime($d) ) {
+                $errors->add('wrr_dob_error', __('Invalid date of birth.', 'reward-roulette'));
+            }
+        }
+
+        return $errors;
     }
 
     /**
