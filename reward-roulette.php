@@ -69,6 +69,8 @@ if ( ! class_exists('Reward_Roulette') ) {
         }
 
         public function on_plugins_loaded() {
+            WRR_Database::maybe_upgrade();
+
             // Init classes
             if (is_admin()) {
                 WRR_Admin::get_instance();

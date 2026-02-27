@@ -35,7 +35,7 @@ class WRR_Game_Engine {
         
         if (is_user_logged_in()) {
             $eligible_date = get_user_meta(get_current_user_id(), '_wrr_birthday_eligible_date', true);
-            if ($eligible_date === date('Y-m-d')) {
+            if ($eligible_date === wp_date('Y-m-d')) {
                 $is_birthday = true;
             }
         }
@@ -99,25 +99,25 @@ class WRR_Game_Engine {
         // 4. Calculate Winner (Weighted Random)
         $winner = $this->get_weighted_winner($valid_sectors);
         
-        // 5. Apply Reward
-        $reward_data = $this->apply_reward($user_id, $winner);
-        
-        // 6. Log Result
-        WRR_Database::log_spin(array(
+        // 5. Log Result
+        $spin_log_id = WRR_Database::log_spin(array(
             'user_id' => $user_id,
             'sector_id' => $winner->id,
             'reward_type' => $winner->type,
             'reward_value' => $winner->value,
-            'ip_address' => $_SERVER['REMOTE_ADDR']
+            'ip_address' => isset($_SERVER['REMOTE_ADDR']) ? sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR'])) : ''
         ));
 
-        // 6.1 Clear birthday eligibility if this was the spin
+        // 6. Apply Reward
+        $reward_data = $this->apply_reward($user_id, $winner, $spin_log_id);
+
+        // 7. Clear birthday eligibility if this was the spin
         $eligible_date = get_user_meta($user_id, '_wrr_birthday_eligible_date', true);
-        if ($eligible_date === date('Y-m-d')) {
+        if ($eligible_date === wp_date('Y-m-d')) {
             delete_user_meta($user_id, '_wrr_birthday_eligible_date');
         }
         
-        // 7. Return Result
+        // 8. Return Result
         wp_send_json_success(array(
             'sector_id' => $winner->id, // Frontend will stop here
             'message' => $reward_data['message'],
@@ -150,9 +150,26 @@ class WRR_Game_Engine {
     /**
      * Apply the reward logic
      */
-    private function apply_reward($user_id, $sector) {
+    private function apply_reward($user_id, $sector, $spin_log_id = 0) {
         $message = "You won " . $sector->name;
-        
+        $reward_record = array(
+            'user_id' => $user_id,
+            'spin_log_id' => absint($spin_log_id),
+            'sector_id' => absint($sector->id),
+            'reward_type' => (string) $sector->type,
+            'reward_name' => (string) $sector->name,
+            'reward_value' => (string) $sector->value,
+            'status' => 'active',
+            'meta' => array(),
+        );
+
+        $sector_coupon_type = isset($sector->coupon_discount_type) ? $sector->coupon_discount_type : 'percent';
+        $sector_expiry_days = isset($sector->coupon_expiry_days) ? $sector->coupon_expiry_days : 20;
+        $sector_usage_limit = isset($sector->coupon_usage_limit) ? $sector->coupon_usage_limit : 1;
+        $coupon_discount_type = in_array($sector_coupon_type, array('percent', 'fixed_cart'), true) ? $sector_coupon_type : 'percent';
+        $coupon_expiry_days = intval($sector_expiry_days);
+        $coupon_usage_limit = max(1, intval($sector_usage_limit));
+
         switch ($sector->type) {
             case 'coupon':
                 // Create dynamic coupon
@@ -163,19 +180,37 @@ class WRR_Game_Engine {
                     $coupon = new WC_Coupon();
                     $coupon->set_code($coupon_code);
                     $coupon->set_amount($amount);
-                    $coupon->set_discount_type('percent'); // Default to percent
+                    $coupon->set_discount_type($coupon_discount_type);
                     $coupon->set_description('Won via Reward Roulette');
-                    $coupon->set_usage_limit(1);
+                    $coupon->set_usage_limit($coupon_usage_limit);
+                    $coupon->set_individual_use(true);
                     $coupon->set_email_restrictions(array(get_userdata($user_id)->user_email));
+                    if ($coupon_expiry_days > 0) {
+                        $coupon->set_date_expires(strtotime('+' . $coupon_expiry_days . ' days'));
+                    }
                     $coupon->save();
                     
-                    $message = "You won a {$amount}% coupon: {$coupon_code}";
+                    $reward_label = ('fixed_cart' === $coupon_discount_type) ? wc_price($amount) : ($amount . '%');
+                    $message = "You won a {$reward_label} coupon: {$coupon_code}";
+                    $expires_at = $coupon_expiry_days > 0 ? gmdate('Y-m-d H:i:s', strtotime('+' . $coupon_expiry_days . ' days')) : null;
+
+                    $reward_record['coupon_id'] = $coupon->get_id();
+                    $reward_record['coupon_code'] = $coupon_code;
+                    $reward_record['expires_at'] = $expires_at;
+                    $reward_record['meta'] = array(
+                        'discount_type' => $coupon_discount_type,
+                        'usage_limit' => $coupon_usage_limit,
+                        'expiry_days' => $coupon_expiry_days,
+                    );
                     
                     // Email Notification
-                    $email_subject = "Вітаємо! Ваш купон на знижку {$amount}%";
+                    $email_subject = "Вітаємо! Ваш купон {$reward_label}";
                     $email_body = "<p>Вітаємо!</p>";
-                    $email_body .= "<p>Ви виграли купон на знижку <strong>{$amount}%</strong> в нашому колесі фортуни.</p>";
+                    $email_body .= "<p>Ви виграли купон <strong>{$reward_label}</strong> в нашому колесі фортуни.</p>";
                     $email_body .= "<p>Ваш промокод: <code style='font-size: 1.2em; border: 1px dashed #ccc; padding: 5px;'>{$coupon_code}</code></p>";
+                    if ($coupon_expiry_days > 0) {
+                        $email_body .= "<p>Термін дії: {$coupon_expiry_days} дн.</p>";
+                    }
                     $email_body .= "<p>Використайте його при оформленні замовлення.</p>";
                     
                     $this->send_win_email($user_id, $email_subject, $email_body);
@@ -193,12 +228,23 @@ class WRR_Game_Engine {
                     $coupon->set_amount(0);
                     $coupon->set_free_shipping(true); // <--- Enable Free Shipping
                     $coupon->set_description('Free Shipping won via Reward Roulette');
-                    $coupon->set_usage_limit(1);
+                    $coupon->set_usage_limit($coupon_usage_limit);
                     $coupon->set_individual_use(true); // Prevent stacking with other coupons? Optional.
                     $coupon->set_email_restrictions(array(get_userdata($user_id)->user_email));
+                    if ($coupon_expiry_days > 0) {
+                        $coupon->set_date_expires(strtotime('+' . $coupon_expiry_days . ' days'));
+                    }
                     $coupon->save();
                     
                     $message = "You won Free Shipping! Code: {$coupon_code}";
+                    $expires_at = $coupon_expiry_days > 0 ? gmdate('Y-m-d H:i:s', strtotime('+' . $coupon_expiry_days . ' days')) : null;
+                    $reward_record['coupon_id'] = $coupon->get_id();
+                    $reward_record['coupon_code'] = $coupon_code;
+                    $reward_record['expires_at'] = $expires_at;
+                    $reward_record['meta'] = array(
+                        'usage_limit' => $coupon_usage_limit,
+                        'expiry_days' => $coupon_expiry_days,
+                    );
                     
                     // Email Notification
                     $email_subject = "Вітаємо! Ви виграли Безкоштовну Доставку";
@@ -233,7 +279,12 @@ class WRR_Game_Engine {
                 
             case 'no_win':
                 $message = "Better luck next time!";
+                $reward_record['status'] = 'lost';
                 break;
+        }
+
+        if ('no_win' !== $sector->type) {
+            WRR_Database::add_user_reward($reward_record);
         }
         
         return array('message' => $message);
@@ -245,7 +296,7 @@ class WRR_Game_Engine {
     private function check_user_eligibility($user_id) {
         // --- BIRTHDAY OVERRIDE ---
         $eligible_date = get_user_meta($user_id, '_wrr_birthday_eligible_date', true);
-        if ($eligible_date === date('Y-m-d')) {
+        if ($eligible_date === wp_date('Y-m-d')) {
             return true; // Birthday priority!
         }
 

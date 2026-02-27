@@ -54,17 +54,22 @@ class WRR_Admin {
     
         // Handle Save
         if (isset($_POST['wrr_save_sectors']) && check_admin_referer('wrr_save_sectors_nonce')) {
-            $this->save_sectors($_POST['sectors']);
+            $sectors_payload = isset($_POST['sectors']) ? (array) wp_unslash($_POST['sectors']) : array();
+            $this->save_sectors($sectors_payload);
             
             // Handle Add New
             if (!empty($_POST['new_sector']['name'])) {
+                $new_sector = (array) wp_unslash($_POST['new_sector']);
                 WRR_Database::add_sector(array(
-                    'name' => sanitize_text_field($_POST['new_sector']['name']),
-                    'type' => sanitize_text_field($_POST['new_sector']['type']),
-                    'value' => sanitize_text_field($_POST['new_sector']['value']),
-                    'probability' => intval($_POST['new_sector']['probability']),
-                    'color' => sanitize_hex_color($_POST['new_sector']['color']),
-                    'is_active' => 1
+                    'name' => sanitize_text_field($new_sector['name']),
+                    'type' => sanitize_text_field($new_sector['type']),
+                    'value' => sanitize_text_field($new_sector['value']),
+                    'probability' => intval($new_sector['probability']),
+                    'color' => sanitize_hex_color($new_sector['color']),
+                    'coupon_discount_type' => in_array($new_sector['coupon_discount_type'], array('percent', 'fixed_cart'), true) ? $new_sector['coupon_discount_type'] : 'percent',
+                    'coupon_expiry_days' => max(0, intval($new_sector['coupon_expiry_days'])),
+                    'coupon_usage_limit' => max(1, intval($new_sector['coupon_usage_limit'])),
+                    'is_active' => 1,
                 ));
             }
             
@@ -130,6 +135,9 @@ class WRR_Admin {
                                         <th>Назва</th>
                                         <th>Тип</th>
                                         <th>Значення</th>
+                                        <th>Тип купону</th>
+                                        <th>Днів дії</th>
+                                        <th>Ліміт</th>
                                         <th>Ймовірність (%)</th>
                                         <th>Колір</th>
                                         <th style="width: 50px;">Вкл</th>
@@ -154,6 +162,18 @@ class WRR_Admin {
                                             </td>
                                             <td>
                                                 <input type="text" name="sectors[<?php echo $sector->id; ?>][value]" value="<?php echo esc_attr($sector->value); ?>" placeholder="10 або ID">
+                                            </td>
+                                            <td>
+                                                <select name="sectors[<?php echo $sector->id; ?>][coupon_discount_type]">
+                                                    <option value="percent" <?php selected($sector->coupon_discount_type, 'percent'); ?>>%</option>
+                                                    <option value="fixed_cart" <?php selected($sector->coupon_discount_type, 'fixed_cart'); ?>>Фікс. сума</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="number" name="sectors[<?php echo $sector->id; ?>][coupon_expiry_days]" value="<?php echo isset($sector->coupon_expiry_days) ? intval($sector->coupon_expiry_days) : 20; ?>" min="0" style="width:85px;">
+                                            </td>
+                                            <td>
+                                                <input type="number" name="sectors[<?php echo $sector->id; ?>][coupon_usage_limit]" value="<?php echo isset($sector->coupon_usage_limit) ? intval($sector->coupon_usage_limit) : 1; ?>" min="1" style="width:70px;">
                                             </td>
                                             <td>
                                                 <input type="number" name="sectors[<?php echo $sector->id; ?>][probability]" value="<?php echo esc_attr($sector->probability); ?>" min="0" max="100">
@@ -187,6 +207,18 @@ class WRR_Admin {
                                         </td>
                                         <td>
                                             <input type="text" name="new_sector[value]" placeholder="Значення">
+                                        </td>
+                                        <td>
+                                            <select name="new_sector[coupon_discount_type]">
+                                                <option value="percent">%</option>
+                                                <option value="fixed_cart">Фікс. сума</option>
+                                            </select>
+                                        </td>
+                                        <td>
+                                            <input type="number" name="new_sector[coupon_expiry_days]" value="20" min="0" style="width:85px;">
+                                        </td>
+                                        <td>
+                                            <input type="number" name="new_sector[coupon_usage_limit]" value="1" min="1" style="width:70px;">
                                         </td>
                                         <td>
                                             <input type="number" name="new_sector[probability]" value="10" min="0" max="100">
@@ -256,6 +288,50 @@ class WRR_Admin {
                                 </tr>
                                 <?php 
                             endif; 
+                            ?>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card" style="margin-top:20px;">
+                    <h3>🎁 Останні видані подарунки</h3>
+                    <table class="wp-list-table widefat fixed striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Користувач</th>
+                                <th>Тип</th>
+                                <th>Подарунок</th>
+                                <th>Купон</th>
+                                <th>Діє до</th>
+                                <th>Статус</th>
+                                <th>Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+                            $recent_rewards = WRR_Database::get_recent_user_rewards(100);
+                            if ($recent_rewards):
+                                foreach ($recent_rewards as $reward):
+                                    $user_label = $reward->user_login ? $reward->user_login . ' (' . $reward->user_email . ')' : ('#' . absint($reward->user_id));
+                                    ?>
+                                    <tr>
+                                        <td><?php echo absint($reward->id); ?></td>
+                                        <td><?php echo esc_html($user_label); ?></td>
+                                        <td><?php echo esc_html($reward->reward_type); ?></td>
+                                        <td><?php echo esc_html($reward->reward_name . ' ' . $reward->reward_value); ?></td>
+                                        <td><?php echo esc_html($reward->coupon_code); ?></td>
+                                        <td><?php echo esc_html(!empty($reward->expires_at) ? $reward->expires_at : '—'); ?></td>
+                                        <td><?php echo esc_html($reward->status); ?></td>
+                                        <td><?php echo esc_html($reward->created_at); ?></td>
+                                    </tr>
+                                    <?php
+                                endforeach;
+                            else:
+                                ?>
+                                <tr><td colspan="8">Подарунків поки немає.</td></tr>
+                                <?php
+                            endif;
                             ?>
                         </tbody>
                     </table>
@@ -557,17 +633,21 @@ class WRR_Admin {
     private function save_sectors($sectors_data) {
         global $wpdb;
         foreach ($sectors_data as $id => $data) {
+            $data = (array) $data;
             $wpdb->update(
                 "{$wpdb->prefix}wrr_sectors",
                 array(
-                    'name' => sanitize_text_field($data['name']),
-                    'type' => sanitize_text_field($data['type']),
-                    'value' => sanitize_text_field($data['value']),
-                    'probability' => intval($data['probability']),
-                    'color' => sanitize_hex_color($data['color']),
-                    'is_active' => isset($data['is_active']) ? 1 : 0
+                    'name' => isset($data['name']) ? sanitize_text_field($data['name']) : '',
+                    'type' => isset($data['type']) ? sanitize_text_field($data['type']) : 'no_win',
+                    'value' => isset($data['value']) ? sanitize_text_field($data['value']) : '',
+                    'probability' => isset($data['probability']) ? intval($data['probability']) : 0,
+                    'color' => isset($data['color']) ? sanitize_hex_color($data['color']) : '#2271b1',
+                    'coupon_discount_type' => (isset($data['coupon_discount_type']) && in_array($data['coupon_discount_type'], array('percent', 'fixed_cart'), true)) ? $data['coupon_discount_type'] : 'percent',
+                    'coupon_expiry_days' => isset($data['coupon_expiry_days']) ? max(0, intval($data['coupon_expiry_days'])) : 20,
+                    'coupon_usage_limit' => isset($data['coupon_usage_limit']) ? max(1, intval($data['coupon_usage_limit'])) : 1,
+                    'is_active' => isset($data['is_active']) ? 1 : 0,
                 ),
-                array('id' => intval($data['id']))
+                array('id' => intval($id))
             );
         }
     }

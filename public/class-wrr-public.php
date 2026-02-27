@@ -4,6 +4,7 @@ if (!defined('ABSPATH')) {
 }
 
 class WRR_Public {
+    const ACCOUNT_ENDPOINT = 'roulette-gifts';
 
     private static $instance = null;
 
@@ -16,6 +17,12 @@ class WRR_Public {
 
     private function __construct() {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
+
+        add_action('init', array($this, 'register_account_endpoint'));
+        add_action('init', array($this, 'maybe_flush_account_endpoint'), 20);
+        add_filter('query_vars', array($this, 'register_account_query_var'));
+        add_filter('woocommerce_account_menu_items', array($this, 'add_account_menu_item'));
+        add_action('woocommerce_account_' . self::ACCOUNT_ENDPOINT . '_endpoint', array($this, 'render_account_rewards'));
 
         // Registration fields integration
         // Support WooCommerce registration form if WC active
@@ -30,6 +37,103 @@ class WRR_Public {
         add_action('register_form', array($this, 'render_register_fields'));
         add_filter('registration_errors', array($this, 'validate_register_fields_wp'), 10, 3);
         add_action('user_register', array($this, 'save_register_fields'));
+    }
+
+    public function register_account_endpoint() {
+        if (!function_exists('add_rewrite_endpoint')) {
+            return;
+        }
+        add_rewrite_endpoint(self::ACCOUNT_ENDPOINT, EP_ROOT | EP_PAGES);
+    }
+
+    public function maybe_flush_account_endpoint() {
+        $flag = (string) get_option('wrr_account_endpoint_flushed', '');
+        if ($flag === WRR_VERSION) {
+            return;
+        }
+        flush_rewrite_rules(false);
+        update_option('wrr_account_endpoint_flushed', WRR_VERSION);
+    }
+
+    public function register_account_query_var($vars) {
+        $vars[] = self::ACCOUNT_ENDPOINT;
+        return $vars;
+    }
+
+    public function add_account_menu_item($items) {
+        if (!is_array($items)) {
+            return $items;
+        }
+
+        $new_items = array();
+        $inserted = false;
+        foreach ($items as $key => $label) {
+            $new_items[$key] = $label;
+            if ('dashboard' === $key) {
+                $new_items[self::ACCOUNT_ENDPOINT] = __('Подарунки від рулетки', 'reward-roulette');
+                $inserted = true;
+            }
+        }
+        if (!$inserted) {
+            $new_items[self::ACCOUNT_ENDPOINT] = __('Подарунки від рулетки', 'reward-roulette');
+        }
+
+        return $new_items;
+    }
+
+    public function render_account_rewards() {
+        if (!is_user_logged_in()) {
+            echo '<p>' . esc_html__('Увійдіть, щоб переглянути подарунки.', 'reward-roulette') . '</p>';
+            return;
+        }
+
+        $user_id = get_current_user_id();
+        $rewards = WRR_Database::get_user_rewards($user_id, 200);
+
+        echo '<h3>' . esc_html__('Подарунки від плагіну', 'reward-roulette') . '</h3>';
+        if (empty($rewards)) {
+            echo '<p>' . esc_html__('Подарунків поки немає.', 'reward-roulette') . '</p>';
+            return;
+        }
+
+        echo '<table class="shop_table shop_table_responsive my_account_orders">';
+        echo '<thead><tr>';
+        echo '<th>' . esc_html__('Дата', 'reward-roulette') . '</th>';
+        echo '<th>' . esc_html__('Подарунок', 'reward-roulette') . '</th>';
+        echo '<th>' . esc_html__('Код', 'reward-roulette') . '</th>';
+        echo '<th>' . esc_html__('Діє до', 'reward-roulette') . '</th>';
+        echo '<th>' . esc_html__('Статус', 'reward-roulette') . '</th>';
+        echo '</tr></thead><tbody>';
+
+        foreach ($rewards as $reward) {
+            $status = (string) $reward->status;
+            $expires_at = (string) $reward->expires_at;
+
+            // Derive current status for Woo coupons.
+            if (!empty($reward->coupon_id)) {
+                $coupon = class_exists('WC_Coupon') ? new WC_Coupon($reward->coupon_id) : null;
+                if ($coupon) {
+                    $usage_limit = (int) $coupon->get_usage_limit();
+                    $usage_count = (int) $coupon->get_usage_count();
+                    if ($usage_limit > 0 && $usage_count >= $usage_limit) {
+                        $status = 'used';
+                    }
+                }
+            }
+            if (!empty($expires_at) && strtotime($expires_at) < time() && 'used' !== $status) {
+                $status = 'expired';
+            }
+
+            echo '<tr>';
+            echo '<td>' . esc_html($reward->created_at) . '</td>';
+            echo '<td>' . esc_html(trim($reward->reward_name . ' ' . $reward->reward_value)) . '</td>';
+            echo '<td>' . esc_html($reward->coupon_code ? $reward->coupon_code : '—') . '</td>';
+            echo '<td>' . esc_html($expires_at ? $expires_at : '—') . '</td>';
+            echo '<td>' . esc_html($status) . '</td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
     }
 
     public function enqueue_scripts() {
