@@ -325,20 +325,41 @@ class WRR_Admin {
                 </form>
             <?php elseif ($active_tab == 'birthday'): ?>
                 <?php
+                if (isset($_POST['wrr_refresh_birthday_preview']) && check_admin_referer('wrr_refresh_birthday_preview_nonce')) {
+                    WRR_Birthday_Automation::force_refresh_year_ahead_list();
+                    echo '<div class="notice notice-success"><p>Список на 365 днів оновлено!</p></div>';
+                }
+
                 if (isset($_POST['wrr_save_birthday_settings']) && check_admin_referer('wrr_save_birthday_nonce')) {
                     $bday_settings = array(
                         'enabled' => isset($_POST['bday_enabled']) ? 'yes' : 'no',
-                        'email_subject' => sanitize_text_field($_POST['bday_subject']),
-                        'email_content' => wp_kses_post($_POST['bday_content'])
+                        'send_window_enabled' => isset($_POST['bday_send_window_enabled']) ? 'yes' : 'no',
+                        'send_window_start' => isset($_POST['bday_send_window_start']) ? sanitize_text_field(wp_unslash($_POST['bday_send_window_start'])) : '09:00',
+                        'send_window_end' => isset($_POST['bday_send_window_end']) ? sanitize_text_field(wp_unslash($_POST['bday_send_window_end'])) : '21:00',
+                        'delivery_channel' => isset($_POST['bday_delivery_channel']) ? sanitize_key(wp_unslash($_POST['bday_delivery_channel'])) : 'email',
+                        'sms_phone_meta_key' => isset($_POST['bday_sms_phone_meta_key']) ? sanitize_key(wp_unslash($_POST['bday_sms_phone_meta_key'])) : 'billing_phone',
+                        'sms_content' => isset($_POST['bday_sms_content']) ? sanitize_textarea_field(wp_unslash($_POST['bday_sms_content'])) : '',
+                        'email_subject' => isset($_POST['bday_subject']) ? sanitize_text_field(wp_unslash($_POST['bday_subject'])) : '',
+                        'email_content' => isset($_POST['bday_content']) ? wp_kses_post(wp_unslash($_POST['bday_content'])) : ''
                     );
+                    if (!in_array($bday_settings['delivery_channel'], array('email', 'sms', 'both'), true)) {
+                        $bday_settings['delivery_channel'] = 'email';
+                    }
                     update_option('wrr_birthday_settings', $bday_settings);
                     echo '<div class="notice notice-success"><p>Налаштування ДН збережено!</p></div>';
                 }
-                $bday_settings = get_option('wrr_birthday_settings', array(
+                $bday_defaults = array(
                     'enabled' => 'no',
+                    'send_window_enabled' => 'no',
+                    'send_window_start' => '09:00',
+                    'send_window_end' => '21:00',
+                    'delivery_channel' => 'email',
+                    'sms_phone_meta_key' => 'billing_phone',
+                    'sms_content' => 'З Днем Народження, {user_name}! 🎉 Вам доступна святкова рулетка: {site_url}',
                     'email_subject' => 'З Днем Народження! 🎂 Отримайте ваш подарунок!',
                     'email_content' => '<p>З Днем Народження!</p><p>Сьогодні ваш особливий день, і ми підготували для вас можливість виграти чудовий подарунок. Прокрутіть наше Колесо Фортуни прямо зараз!</p><p><a href="{site_url}" style="padding: 10px 20px; background: #2271b1; color: #fff; text-decoration: none; border-radius: 5px;">Прокрутити Колесо</a></p>'
-                ));
+                );
+                $bday_settings = wp_parse_args(get_option('wrr_birthday_settings', array()), $bday_defaults);
                 ?>
                 <form method="post" action="">
                     <?php wp_nonce_field('wrr_save_birthday_nonce'); ?>
@@ -354,6 +375,51 @@ class WRR_Admin {
                             <th scope="row">Тема Email</th>
                             <td>
                                 <input type="text" name="bday_subject" value="<?php echo esc_attr($bday_settings['email_subject']); ?>" class="large-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Канал відправки</th>
+                            <td>
+                                <select name="bday_delivery_channel">
+                                    <option value="email" <?php selected($bday_settings['delivery_channel'], 'email'); ?>>Email</option>
+                                    <option value="sms" <?php selected($bday_settings['delivery_channel'], 'sms'); ?>>SMS</option>
+                                    <option value="both" <?php selected($bday_settings['delivery_channel'], 'both'); ?>>Email + SMS</option>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Період відправки</th>
+                            <td>
+                                <label style="display:block;margin-bottom:8px;">
+                                    <input type="checkbox" name="bday_send_window_enabled" value="1" <?php checked($bday_settings['send_window_enabled'], 'yes'); ?>>
+                                    Надсилати тільки в заданий період
+                                </label>
+                                <label style="display:inline-block;margin-right:12px;">
+                                    Від:
+                                    <input type="time" name="bday_send_window_start" value="<?php echo esc_attr($bday_settings['send_window_start']); ?>">
+                                </label>
+                                <label style="display:inline-block;">
+                                    До:
+                                    <input type="time" name="bday_send_window_end" value="<?php echo esc_attr($bday_settings['send_window_end']); ?>">
+                                </label>
+                                <p class="description">
+                                    Перевірка виконується кожні ~15 хвилин. Сьогодні система готує чергу на завтра і в день ДН надсилає повідомлення у цей період. Якщо "Від" дорівнює "До" — відправка дозволена цілий день.
+                                </p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row">SMS налаштування</th>
+                            <td>
+                                <p>
+                                    <label>Meta ключ телефону користувача:
+                                        <input type="text" name="bday_sms_phone_meta_key" value="<?php echo esc_attr($bday_settings['sms_phone_meta_key']); ?>" class="regular-text" placeholder="billing_phone">
+                                    </label>
+                                </p>
+                                <p>
+                                    <label>Текст SMS:</label><br>
+                                    <textarea name="bday_sms_content" rows="4" class="large-text"><?php echo esc_textarea($bday_settings['sms_content']); ?></textarea>
+                                </p>
+                                <p class="description">Шорткоди: <code>{user_name}</code>, <code>{site_url}</code>. Для фактичної SMS потрібна інтеграція провайдера через хук <code>wrr_send_sms</code>.</p>
                             </td>
                         </tr>
                         <tr>
@@ -394,6 +460,94 @@ class WRR_Admin {
                         <input type="submit" name="wrr_send_test_email" class="button button-secondary" value="Надіслати Тестовий Email">
                         <p class="description">Лист міститиме посилання з активованим тестовим режимом рулетки.</p>
                     </form>
+                </div>
+
+                <?php
+                $today_found = WRR_Birthday_Automation::get_today_found_snapshot();
+                $year_ahead = WRR_Birthday_Automation::get_year_ahead_list();
+                $year_days = !empty($year_ahead['days']) && is_array($year_ahead['days']) ? $year_ahead['days'] : array();
+                ?>
+
+                <div class="card" style="max-width: 1000px; padding: 20px; margin-top: 20px;">
+                    <h3>🔎 Сьогодні знайдено іменинників</h3>
+                    <p class="description">
+                        Дата перевірки: <strong><?php echo !empty($today_found['date']) ? esc_html($today_found['date']) : '—'; ?></strong>,
+                        знайдено: <strong><?php echo !empty($today_found['count']) ? intval($today_found['count']) : 0; ?></strong>,
+                        оновлено: <strong><?php echo !empty($today_found['updated_at']) ? esc_html($today_found['updated_at']) : '—'; ?></strong>
+                    </p>
+                    <?php if (empty($today_found['items']) || !is_array($today_found['items'])): ?>
+                        <p>На сьогодні іменинників не знайдено.</p>
+                    <?php else: ?>
+                        <table class="widefat striped">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Ім'я</th>
+                                    <th>Email</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($today_found['items'] as $item): ?>
+                                    <tr>
+                                        <td><?php echo isset($item['user_id']) ? intval($item['user_id']) : 0; ?></td>
+                                        <td><?php echo isset($item['name']) ? esc_html($item['name']) : ''; ?></td>
+                                        <td><?php echo isset($item['email']) ? esc_html($item['email']) : ''; ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+
+                <div class="card" style="max-width: 1000px; padding: 20px; margin-top: 20px;">
+                    <h3>📅 Список ДН на 365 днів вперед</h3>
+                    <p class="description">
+                        База для дати: <strong><?php echo !empty($year_ahead['built_for']) ? esc_html($year_ahead['built_for']) : '—'; ?></strong>,
+                        оновлено: <strong><?php echo !empty($year_ahead['updated_at']) ? esc_html($year_ahead['updated_at']) : '—'; ?></strong>.
+                        Список автооновлюється щодня cron-ом.
+                    </p>
+                    <form method="post" action="" style="margin-bottom:12px;">
+                        <?php wp_nonce_field('wrr_refresh_birthday_preview_nonce'); ?>
+                        <input type="submit" name="wrr_refresh_birthday_preview" class="button button-secondary" value="Оновити список зараз">
+                    </form>
+
+                    <?php if (empty($year_days)): ?>
+                        <p>На найближчі 365 днів іменинників не знайдено.</p>
+                    <?php else: ?>
+                        <table class="widefat striped">
+                            <thead>
+                                <tr>
+                                    <th>Дата</th>
+                                    <th>К-сть</th>
+                                    <th>Користувачі</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($year_days as $day): ?>
+                                    <tr>
+                                        <td><?php echo !empty($day['date']) ? esc_html($day['date']) : ''; ?></td>
+                                        <td><?php echo !empty($day['count']) ? intval($day['count']) : 0; ?></td>
+                                        <td>
+                                            <?php
+                                            $labels = array();
+                                            if (!empty($day['items']) && is_array($day['items'])) {
+                                                foreach ($day['items'] as $item) {
+                                                    $labels[] = sprintf(
+                                                        '#%d %s (%s)',
+                                                        isset($item['user_id']) ? intval($item['user_id']) : 0,
+                                                        isset($item['name']) ? sanitize_text_field($item['name']) : '',
+                                                        isset($item['email']) ? sanitize_email($item['email']) : ''
+                                                    );
+                                                }
+                                            }
+                                            echo esc_html(implode(', ', $labels));
+                                            ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
         </div>
