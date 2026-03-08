@@ -134,6 +134,7 @@ class WRR_Public {
         }
 
         echo '</tbody></table>';
+    }
 
     /**
      * Normalize Ukrainian phone number to +380XXXXXXXXX.
