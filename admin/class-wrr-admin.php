@@ -87,6 +87,7 @@ class WRR_Admin {
             $reg_fields = array(
                 'first_name' => isset($_POST['reg_field_first_name']) ? 1 : 0,
                 'last_name'  => isset($_POST['reg_field_last_name']) ? 1 : 0,
+                'phone'      => isset($_POST['reg_field_phone']) ? 1 : 0,
                 'date_of_birth' => isset($_POST['reg_field_dob']) ? 1 : 0
             );
             update_option('wrr_registration_fields', $reg_fields);
@@ -95,6 +96,7 @@ class WRR_Admin {
             $reg_labels = array(
                 'first_name' => isset($_POST['reg_label_first_name']) ? sanitize_text_field($_POST['reg_label_first_name']) : 'First name',
                 'last_name' => isset($_POST['reg_label_last_name']) ? sanitize_text_field($_POST['reg_label_last_name']) : 'Last name',
+                'phone' => isset($_POST['reg_label_phone']) ? sanitize_text_field($_POST['reg_label_phone']) : 'Phone',
                 'date_of_birth' => isset($_POST['reg_label_dob']) ? sanitize_text_field($_POST['reg_label_dob']) : 'Date of birth'
             );
             update_option('wrr_registration_labels', $reg_labels);
@@ -356,8 +358,14 @@ class WRR_Admin {
                             <th scope="row">Поля реєстрації (WooCommerce)</th>
                             <td>
                                 <?php
-                                $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
-                                $reg_labels = get_option('wrr_registration_labels', array('first_name' => 'First name', 'last_name' => 'Last name', 'date_of_birth' => 'Date of birth'));
+                                $reg_fields = wp_parse_args(
+                                    get_option('wrr_registration_fields', array()),
+                                    array('first_name'=>1,'last_name'=>1,'phone'=>1,'date_of_birth'=>0)
+                                );
+                                $reg_labels = wp_parse_args(
+                                    get_option('wrr_registration_labels', array()),
+                                    array('first_name' => 'First name', 'last_name' => 'Last name', 'phone' => 'Phone', 'date_of_birth' => 'Date of birth')
+                                );
                                 ?>
                                 <label style="display:block; margin-bottom:5px;">
                                     <input type="checkbox" name="reg_field_first_name" value="1" <?php checked(!empty($reg_fields['first_name']),1); ?>>
@@ -370,6 +378,12 @@ class WRR_Admin {
                                     Показувати поле "Прізвище"
                                 </label>
                                 <input type="text" name="reg_label_last_name" value="<?php echo esc_attr($reg_labels['last_name']); ?>" class="regular-text" style="margin-bottom:10px;">
+
+                                <label style="display:block; margin-bottom:5px;">
+                                    <input type="checkbox" name="reg_field_phone" value="1" <?php checked(!empty($reg_fields['phone']),1); ?>>
+                                    Показувати поле "Телефон"
+                                </label>
+                                <input type="text" name="reg_label_phone" value="<?php echo esc_attr($reg_labels['phone']); ?>" class="regular-text" style="margin-bottom:10px;">
 
                                 <label style="display:block; margin-bottom:5px;">
                                     <input type="checkbox" name="reg_field_dob" value="1" <?php checked(!empty($reg_fields['date_of_birth']),1); ?>>

@@ -134,6 +134,26 @@ class WRR_Public {
         }
 
         echo '</tbody></table>';
+
+    /**
+     * Normalize Ukrainian phone number to +380XXXXXXXXX.
+     */
+    private function normalize_ukrainian_phone($phone) {
+        $phone = preg_replace('/\D+/', '', (string) $phone);
+
+        if (strpos($phone, '380') === 0 && strlen($phone) === 12) {
+            return '+' . $phone;
+        }
+
+        if (strpos($phone, '80') === 0 && strlen($phone) === 11) {
+            return '+3' . $phone;
+        }
+
+        if (strpos($phone, '0') === 0 && strlen($phone) === 10) {
+            return '+38' . $phone;
+        }
+
+        return '';
     }
 
     public function enqueue_scripts() {
@@ -159,8 +179,14 @@ class WRR_Public {
             )
         ));
         // Pass registration field visibility and labels to fallback script
-        $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
-        $reg_labels = get_option('wrr_registration_labels', array('first_name' => 'First name', 'last_name' => 'Last name', 'date_of_birth' => 'Date of birth'));
+        $reg_fields = wp_parse_args(
+            get_option('wrr_registration_fields', array()),
+            array('first_name'=>1,'last_name'=>1,'phone'=>1,'date_of_birth'=>0)
+        );
+        $reg_labels = wp_parse_args(
+            get_option('wrr_registration_labels', array()),
+            array('first_name' => 'First name', 'last_name' => 'Last name', 'phone' => 'Phone', 'date_of_birth' => 'Date of birth')
+        );
         wp_localize_script('wrr-register-fallback', 'wrr_register_settings', array('fields' => $reg_fields, 'labels' => $reg_labels));
     }
 
@@ -179,12 +205,19 @@ class WRR_Public {
         }
         $wrr_rendered = true;
         // Check settings which fields to show and labels
-        $reg_fields = get_option('wrr_registration_fields', array('first_name'=>1,'last_name'=>1,'date_of_birth'=>0));
-        $reg_labels = get_option('wrr_registration_labels', array('first_name' => 'First name', 'last_name' => 'Last name', 'date_of_birth' => 'Date of birth'));
+        $reg_fields = wp_parse_args(
+            get_option('wrr_registration_fields', array()),
+            array('first_name'=>1,'last_name'=>1,'phone'=>1,'date_of_birth'=>0)
+        );
+        $reg_labels = wp_parse_args(
+            get_option('wrr_registration_labels', array()),
+            array('first_name' => 'First name', 'last_name' => 'Last name', 'phone' => 'Phone', 'date_of_birth' => 'Date of birth')
+        );
 
         // Preserve posted values
         $first = isset($_POST['wrr_first_name']) ? esc_attr($_POST['wrr_first_name']) : '';
         $last  = isset($_POST['wrr_last_name']) ? esc_attr($_POST['wrr_last_name']) : '';
+        $phone = isset($_POST['wrr_phone']) ? esc_attr($_POST['wrr_phone']) : '';
         $dob   = isset($_POST['wrr_dob']) ? esc_attr($_POST['wrr_dob']) : '';
 
         ?>
@@ -199,6 +232,23 @@ class WRR_Public {
         <p class="form-row form-row-last">
             <label for="reg_wrr_last_name"><?php echo esc_html($reg_labels['last_name']); ?> <span class="required">*</span></label>
             <input type="text" class="input-text" name="wrr_last_name" id="reg_wrr_last_name" value="<?php echo $last; ?>" />
+        </p>
+        <?php endif; ?>
+
+        <?php if (!empty($reg_fields['phone'])): ?>
+        <p class="form-row form-row-wide">
+            <label for="reg_wrr_phone"><?php echo esc_html($reg_labels['phone']); ?> <span class="required">*</span></label>
+            <input
+                type="tel"
+                class="input-text"
+                name="wrr_phone"
+                id="reg_wrr_phone"
+                value="<?php echo $phone; ?>"
+                placeholder="+380 (67) 123-45-67"
+                inputmode="tel"
+                autocomplete="tel"
+                data-country-code="+380"
+            />
         </p>
         <?php endif; ?>
 
@@ -227,6 +277,12 @@ class WRR_Public {
             $validation_errors->add('wrr_last_name_error', __('Last name is required.', 'reward-roulette'));
         }
 
+        if ( isset($_POST['wrr_phone']) && empty(trim($_POST['wrr_phone'])) ) {
+            $validation_errors->add('wrr_phone_error', __('Phone is required.', 'reward-roulette'));
+        } elseif ( isset($_POST['wrr_phone']) && '' === $this->normalize_ukrainian_phone($_POST['wrr_phone']) ) {
+            $validation_errors->add('wrr_phone_error', __('Enter a valid Ukrainian phone number.', 'reward-roulette'));
+        }
+
         // DOB is optional; if provided, basic sanitize/format check
         if ( isset($_POST['wrr_dob']) && !empty($_POST['wrr_dob']) ) {
             $d = sanitize_text_field($_POST['wrr_dob']);
@@ -246,6 +302,12 @@ class WRR_Public {
 
         if ( isset($_POST['wrr_last_name']) && empty(trim($_POST['wrr_last_name'])) ) {
             $errors->add('wrr_last_name_error', __('Last name is required.', 'reward-roulette'));
+        }
+
+        if ( isset($_POST['wrr_phone']) && empty(trim($_POST['wrr_phone'])) ) {
+            $errors->add('wrr_phone_error', __('Phone is required.', 'reward-roulette'));
+        } elseif ( isset($_POST['wrr_phone']) && '' === $this->normalize_ukrainian_phone($_POST['wrr_phone']) ) {
+            $errors->add('wrr_phone_error', __('Enter a valid Ukrainian phone number.', 'reward-roulette'));
         }
 
         if ( isset($_POST['wrr_dob']) && !empty($_POST['wrr_dob']) ) {
@@ -286,6 +348,14 @@ class WRR_Public {
             update_user_meta($customer_id, '_wrr_birthday_md', $md);
             // Optionally store in billing meta
             update_user_meta($customer_id, 'billing_birth_date', $dob);
+        }
+
+        if ( isset($_POST['wrr_phone']) ) {
+            $phone = $this->normalize_ukrainian_phone(wp_unslash($_POST['wrr_phone']));
+            if ( ! empty($phone) ) {
+                update_user_meta($customer_id, 'billing_phone', $phone);
+                update_user_meta($customer_id, '_wrr_phone', $phone);
+            }
         }
     }
 }
